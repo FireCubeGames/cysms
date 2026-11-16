@@ -8,7 +8,7 @@
     <RootNamespace>Cysms</RootNamespace>
     <ApplicationIcon>src\CYSMS.ico</ApplicationIcon>
     <ApplicationManifest>src\app.manifest</ApplicationManifest>
-    <Version>5.6.1</Version>
+    <Version>5.6.2</Version>
     <Product>CYSMS</Product>
     <Description>Android screen mirroring launcher powered by scrcpy</Description>
     <Copyright>Copyright (c) 2026 Tjiong Chern</Copyright>
