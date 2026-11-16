@@ -225,7 +225,7 @@ namespace Cysms
         public string Key, Name, LogPath;
         public Process Proc;
         public DateTime Start = DateTime.Now;
-        public bool Verified, Record, Retried;
+        public bool Verified, Record, Retried, UserStopped;
         public Dictionary<string, object> Settings;
         public string Profile;
         StreamWriter log;
@@ -262,8 +262,11 @@ namespace Cysms
 
         public bool Exited { get { try { return Proc.HasExited; } catch { return true; } } }
 
+        public int ExitCode { get { try { return Proc.HasExited ? Proc.ExitCode : 0; } catch { return -1; } } }
+
         public void Stop()
         {
+            UserStopped = true;
             try { if (!Proc.HasExited) Proc.Kill(); } catch { }
         }
 
