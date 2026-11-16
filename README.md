@@ -1,6 +1,6 @@
 <p align="center"><img src="docs/logo.png" width="96" alt="CYSMS logo"></p>
 
-# CYSMS
+# CanYouSeeMyScreen
 
 **See and control your Android phone or tablet from a Windows PC.** CYSMS is a friendly front end for [scrcpy](https://github.com/Genymobile/scrcpy): pick a device, press Connect, and its screen opens in a window you can use with your mouse and keyboard. scrcpy and adb are included, so there is nothing else to install.
 
