@@ -254,14 +254,14 @@ Not supported
 
 ANDROID (your phone or tablet)
 
-  Android 5.0 or later   Mirroring and control (USB or Wi-Fi)
-  Android 10 or later    Separate virtual display (Desktop tab)
-  Android 11 or later    Sound on the PC. On Android 11 itself, keep the
-                         phone unlocked while it connects.
-                         Pair with code (wireless debugging, no cable)
-  Android 12 or later    Phone camera as the source
-  Android 13 or later    App playback audio, keep sound on the phone too
-  USB only               AOA keyboard, mouse and gamepad modes
+  - Android 5.0 or later: mirroring and control, over USB or Wi-Fi.
+  - Android 10 or later: separate virtual display (Desktop tab).
+  - Android 11 or later: sound on the PC, and Pair with code (no cable).
+    On Android 11 itself, keep the phone unlocked while it connects.
+  - Android 12 or later: the phone camera as the source.
+  - Android 13 or later: app playback audio, and keeping the sound on the
+    phone at the same time.
+  - USB only: AOA keyboard, mouse and gamepad modes.
 
 What CYSMS does about it
   - Devices older than Android 5.0 show ""Not supported"" in the list.
