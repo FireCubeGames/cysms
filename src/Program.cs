@@ -11,12 +11,19 @@ namespace Cysms
         public static volatile bool ShowRequested;
         public static bool RestartRequested;
 
+        // Demo mode (--demo, or a file named CYSMS.demo next to the exe) shows sample devices from a throw-away
+        // data folder, for screenshots. With the file, it also saves screenshots to a "screenshots" folder and exits.
+        public static bool Demo, DemoShots;
+
         [STAThread]
-        static void Main()
+        static void Main(string[] args)
         {
+            var flag = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "CYSMS.demo");
+            DemoShots = File.Exists(flag);
+            Demo = DemoShots || Array.IndexOf(args, "--demo") >= 0;
             bool created;
-            using (var mutex = new Mutex(true, @"Local\CYSMS_Native_SingleInstance", out created))
-            using (var showEvent = new EventWaitHandle(false, EventResetMode.AutoReset, @"Local\CYSMS_Native_Show"))
+            using (var mutex = new Mutex(true, Demo ? @"Local\CYSMS_Native_Demo" : @"Local\CYSMS_Native_SingleInstance", out created))
+            using (var showEvent = new EventWaitHandle(false, EventResetMode.AutoReset, Demo ? @"Local\CYSMS_Native_DemoShow" : @"Local\CYSMS_Native_Show"))
             {
                 if (!created) { showEvent.Set(); return; }   // already running: bring it forward
 
@@ -29,6 +36,11 @@ namespace Cysms
 
                 var local = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
                 var dataDir = Path.Combine(local, "CYSMS");
+                if (Demo)
+                {
+                    dataDir = Path.Combine(Path.GetTempPath(), "CYSMS-demo");
+                    try { if (Directory.Exists(dataDir)) Directory.Delete(dataDir, true); } catch { }
+                }
                 var logDir = Path.Combine(dataDir, "logs");
                 Directory.CreateDirectory(logDir);
                 CleanLogs(logDir);
@@ -39,9 +51,10 @@ namespace Cysms
 
                 Ui.Init();
                 var store = new Store(dataDir);
-                store.Load(Path.Combine(local, "ScrcpyApp", "devices.json"));
+                store.Load(Demo ? null : Path.Combine(local, "ScrcpyApp", "devices.json"));
+                if (Demo) { store.App["TourSeen"] = true; store.App["AutoWireless"] = false; store.App["MinimizeToTray"] = false; }
                 Ui.ApplyTheme(store.AppStr("Theme"));
-                Stickers.Load(store.AppStr("StickerFolder"));
+                Stickers.Load(Demo ? "" : store.AppStr("StickerFolder"));
                 Application.Run(new MainForm(store, logDir));
             }
             // Restart after the single-instance lock is released (e.g. theme change)
