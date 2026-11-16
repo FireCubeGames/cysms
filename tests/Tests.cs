@@ -117,6 +117,13 @@ Eq("win10 1809 warn", Compat.WindowsNote(new Version(10, 0, 17763), true, "x64")
 Eq("bundled runs", Compat.BundledRuns(new Version(10, 0, 19045), true, "x64") + "|" + Compat.BundledRuns(new Version(10, 0, 19045), true, "ARM64"), "True|False");
 Eq("hint android too old", Parse.LogHint("[server] ERROR: Camera mirroring is not supported before Android 12"), "Camera mirroring needs Android 12 or later. Turn that option off for this device.");
 
+// ---- lock screen
+Eq("locked dreaming", Parse.Locked("    mDreamingLockscreen=true mDreamingSleepToken=null"), true);
+Eq("locked keyguard ctrl", Parse.Locked("  KeyguardController:\n    mKeyguardShowing=true\n    mAodShowing=false"), true);
+Eq("unlocked", Parse.Locked("    mDreamingLockscreen=false\n    mKeyguardShowing=false"), false);
+Eq("lock unknown", Parse.Locked("nothing here"), null);
+Eq("lock delegate", Parse.Locked("KeyguardServiceDelegate\n    showing=true\n    inputRestricted=true"), true);
+
 Console.WriteLine($"\npassed {pass}, failed {fail}");
     return fail == 0 ? 0 : 1;
   }

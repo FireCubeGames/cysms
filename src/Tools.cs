@@ -250,7 +250,8 @@ namespace Cysms
         public string Key, Name, LogPath;
         public Process Proc;
         public DateTime Start = DateTime.Now;
-        public bool Verified, Record, Retried, UserStopped;
+        public bool Verified, Record, Retried, UserStopped, Locked;
+        public string Serial;
         public Dictionary<string, object> Settings;
         public string Profile;
         StreamWriter log;

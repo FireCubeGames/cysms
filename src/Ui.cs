@@ -270,6 +270,19 @@ What CYSMS does about it
   - Settings that are the whole point of a profile (camera, virtual
     display) stop with an explanation instead of failing.
 
+LOCKED DEVICES
+
+  - Mirroring a locked device works: you see its lock screen.
+  - Face and fingerprint unlock only work on the device itself.
+  - To unlock from this PC, swipe up in the mirror, type your PIN or
+    password and press Enter. Android hides the PIN screen from screen
+    capture, so it may look black while you type. Patterns can't be
+    drawn blind: unlock those on the device.
+  - CYSMS warns you before connecting to a locked device. Phone > Wake
+    and open PIN entry does the swipe for you.
+  - View only can't unlock a device; Android 11 needs the device
+    unlocked when mirroring starts to forward sound.
+
 Brands
   Some manufacturers add extra switches (Samsung Auto Blocker, Xiaomi
   ""USB debugging (Security settings)""). See Help > Phone setup guide.
