@@ -56,7 +56,7 @@ CYSMS runs entirely on your PC. It has no accounts, analytics or tracking, and i
 
 - Source is C# (.NET Framework 4.8, Windows Forms) in `src/`; unit tests for the core logic are in `tests/`.
 - Build with the .NET 8 SDK: `dotnet build -c Release -o build`. See [BUILD.md](BUILD.md) for the portable folder and Store (MSIX) packaging.
-- Every push runs the tests and builds the portable folder (the **Build** workflow). Pushing a tag such as `v5.5.1` publishes a release with the portable zip.
+- Every push runs the tests and builds the portable folder (the **Build** workflow). When a new `<Version>` in `CYSMS.csproj` reaches `main`, a release with the portable zip is published automatically.
 - `CYSMS.exe --demo` starts with sample devices from a throw-away data folder, which is how the screenshots above were made.
 
 ## Licence
