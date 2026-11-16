@@ -1,0 +1,38 @@
+CYSMS - third-party software notices
+====================================
+
+CYSMS bundles the official Windows release of scrcpy (folder "scrcpy\"),
+unmodified, as published at https://github.com/Genymobile/scrcpy/releases
+(scrcpy-win64-v3.3.4.zip, SHA-256 d8a155b7c180b7ca4cdadd40712b8750b63f3aab48cb5b8a2a39ac2d0d4c5d38).
+CYSMS runs these programs as separate processes; it does not modify or link
+to them.
+
+scrcpy (scrcpy.exe, scrcpy-server)
+  Copyright (C) 2018 Genymobile, Copyright (C) 2018-2025 Romain Vimont
+  Licensed under the Apache License, Version 2.0 - full text in scrcpy\LICENSE-scrcpy.txt
+  Source: https://github.com/Genymobile/scrcpy
+
+Android Debug Bridge (adb.exe, AdbWinApi.dll, AdbWinUsbApi.dll)
+  Part of the Android SDK Platform-Tools, from the Android Open Source Project.
+  Source code licensed under the Apache License, Version 2.0.
+  Source: https://android.googlesource.com/platform/packages/modules/adb/
+  Platform-Tools terms: https://developer.android.com/studio/releases/platform-tools
+
+FFmpeg (avcodec-61.dll, avformat-61.dll, avutil-59.dll, swresample-5.dll)
+  Licensed under the GNU Lesser General Public License (LGPL) v2.1 or later.
+  These are dynamically loaded, unmodified libraries; you may replace them
+  with your own compatible builds.
+  Source: https://ffmpeg.org/download.html  (build scripts used by scrcpy:
+  https://github.com/Genymobile/scrcpy/tree/master/app/deps)
+
+SDL2 (SDL2.dll)
+  Copyright (C) 1997-2025 Sam Lantinga. Licensed under the zlib license.
+  Source: https://github.com/libsdl-org/SDL
+
+libusb (libusb-1.0.dll)
+  Licensed under the GNU Lesser General Public License (LGPL) v2.1 or later.
+  Dynamically loaded, unmodified; you may replace it with a compatible build.
+  Source: https://github.com/libusb/libusb
+
+The full LGPL v2.1 text: https://www.gnu.org/licenses/old-licenses/lgpl-2.1.txt
+The zlib license text:  https://zlib.net/zlib_license.html

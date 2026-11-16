@@ -1,0 +1,66 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+env:
+  SCRCPY_VERSION: v3.3.4
+  SCRCPY_SHA256: d8a155b7c180b7ca4cdadd40712b8750b63f3aab48cb5b8a2a39ac2d0d4c5d38
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Unit tests
+        working-directory: tests
+        run: dotnet run
+
+      - name: Build CYSMS.exe
+        run: dotnet build CYSMS.csproj -c Release -o build
+
+      - name: Download scrcpy and verify its checksum
+        shell: pwsh
+        run: |
+          $zip = "scrcpy-win64-$env:SCRCPY_VERSION.zip"
+          Invoke-WebRequest "https://github.com/Genymobile/scrcpy/releases/download/$env:SCRCPY_VERSION/$zip" -OutFile $zip
+          $hash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLower()
+          if ($hash -ne $env:SCRCPY_SHA256) { throw "scrcpy checksum mismatch: $hash" }
+          Expand-Archive $zip -DestinationPath scrcpy-tmp
+
+      - name: Assemble the portable folder
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist/CYSMS/scrcpy | Out-Null
+          Copy-Item build/CYSMS.exe, build/CYSMS.exe.config dist/CYSMS/
+          Copy-Item packaging/THIRD-PARTY-NOTICES.txt dist/CYSMS/
+          Copy-Item packaging/README-portable.txt dist/CYSMS/README.txt
+          $src = Get-ChildItem scrcpy-tmp -Directory | Select-Object -First 1
+          Get-ChildItem $src.FullName -File | Where-Object { $_.Extension -notin '.bat', '.vbs' } | Copy-Item -Destination dist/CYSMS/scrcpy/
+          Copy-Item packaging/LICENSE-scrcpy.txt dist/CYSMS/scrcpy/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CYSMS-portable
+          path: dist/CYSMS
+
+      - name: Attach the portable zip to a release (tags only)
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          Compress-Archive dist/CYSMS "CYSMS-${{ github.ref_name }}-portable.zip"
+          gh release create "${{ github.ref_name }}" "CYSMS-${{ github.ref_name }}-portable.zip" --title "CYSMS ${{ github.ref_name }}" --generate-notes
+
+permissions:
+  contents: write

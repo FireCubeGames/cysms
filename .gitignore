@@ -1,0 +1,13 @@
+build/
+obj/
+bin/
+dist/
+probe/
+tests/obj/
+tests/bin/
+msix/stage/
+msix/logo-preview.png
+*.msix
+*.pfx
+*.user
+.vs/
