@@ -787,6 +787,78 @@ namespace Cysms
             finally { layingColumns = false; }
         }
 
+        // =================================================================== demo mode (sample data for screenshots)
+        void DemoRows()
+        {
+            pcSsid = "Home-5G"; pcNetText.Text = "This PC: Wi-Fi \u201CHome-5G\u201D";
+            if (store.Devices.Count == 0)
+            {
+                store.Devices.Add(new DeviceRec { Name = "Pixel 8", IP = "192.168.1.21", HwSerial = "DEMO0001", LastSsid = "Home-5G", Profile = "Auto quality" });
+                store.Devices.Add(new DeviceRec { Name = "Galaxy Tab S10", IP = "192.168.1.34", HwSerial = "DEMO0002", LastSsid = "Home-5G", Profile = "High quality + audio" });
+                store.Devices.Add(new DeviceRec { Name = "Lenovo Y700", IP = "192.168.1.47", HwSerial = "DEMO0003", LastSsid = "Home-5G" });
+            }
+            var d = store.Devices;
+            rows = new List<Row>
+            {
+                new Row { Key = d[0].Id, Name = d[0].Name, Type = "wifi", Serial = d[0].AdbSerial, Saved = true, Dev = d[0], State = "connected", StatusText = "Ready", Profile = d[0].Profile, AdbState = "device" },
+                new Row { Key = d[1].Id, Name = d[1].Name, Type = "wifi", Serial = d[1].AdbSerial, Saved = true, Dev = d[1], State = "connected", StatusText = "Ready", Profile = d[1].Profile, AdbState = "device" },
+                new Row { Key = "new:DEMO0004", Name = "Galaxy S23", Type = "usb", Serial = "DEMO0004", Saved = false, State = "connected", StatusText = "Ready \u2013 new", Profile = "Default", AdbState = "device" },
+                new Row { Key = d[2].Id, Name = d[2].Name, Type = "wifi", Serial = d[2].AdbSerial, Saved = true, Dev = d[2], State = "offline", StatusText = "Offline", Profile = d[2].Profile },
+            };
+            info[rows[0].Serial] = new DevInfo { Battery = 84, Android = "16", Ssid = "Home-5G", When = DateTime.Now };
+            info[rows[1].Serial] = new DevInfo { Battery = 61, Charging = true, Android = "16", Ssid = "Home-5G", When = DateTime.Now };
+            info[rows[2].Serial] = new DevInfo { Battery = 47, Charging = true, Android = "15", Ssid = "Home-5G", When = DateTime.Now };
+        }
+
+        [System.Runtime.InteropServices.DllImport("dwmapi.dll")]
+        static extern int DwmGetWindowAttribute(IntPtr hwnd, int attr, out RECT rect, int size);
+        [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+        struct RECT { public int L, T, R, B; }
+
+        static void CaptureWindow(Form f, string path)
+        {
+            f.TopMost = true; f.Activate(); f.Refresh(); Application.DoEvents();
+            System.Threading.Thread.Sleep(700); Application.DoEvents();
+            var b = f.Bounds;
+            if (DwmGetWindowAttribute(f.Handle, 9, out var r, 16) == 0 && r.R > r.L) b = Rectangle.FromLTRB(r.L, r.T, r.R, r.B);
+            using (var bmp = new Bitmap(b.Width, b.Height))
+            {
+                using (var g = Graphics.FromImage(bmp)) g.CopyFromScreen(b.Location, Point.Empty, b.Size);
+                bmp.Save(path, System.Drawing.Imaging.ImageFormat.Png);
+            }
+            f.TopMost = false;
+        }
+
+        async Task DemoScreenshots()
+        {
+            var dir = Path.Combine(Tools.AppDir, "screenshots");
+            Directory.CreateDirectory(dir);
+            try
+            {
+                store.App["Mode"] = "Simple"; store.App["SimpleSize"] = S(520) + "x" + S(430); ApplyMode();
+                CenterToScreen(); if (list.Items.Count > 0) list.Items[0].Selected = true;
+                await Task.Delay(600);
+                CaptureWindow(this, Path.Combine(dir, "simple.png"));
+
+                store.App["Mode"] = "Advanced"; store.App["AdvancedSize"] = S(1080) + "x" + S(680); ApplyMode();
+                CenterToScreen();
+                await Task.Delay(600);
+                CaptureWindow(this, Path.Combine(dir, "advanced.png"));
+
+                var t = new Timer { Interval = 900 };
+                t.Tick += (s, e) =>
+                {
+                    t.Stop();
+                    var f = Form.ActiveForm;
+                    if (f != null && f != this) { CaptureWindow(f, Path.Combine(dir, "tour.png")); f.Close(); }
+                };
+                t.Start();
+                ShowTour();
+            }
+            catch (Exception ex) { try { File.WriteAllText(Path.Combine(dir, "error.txt"), ex.ToString()); } catch { } }
+            reallyExit = true; Close();
+        }
+
         // =================================================================== quick tour
         void ShowTour()
         {
@@ -1084,6 +1156,7 @@ namespace Cysms
             refreshing = true;
             try
             {
+                if (Program.Demo) { DemoRows(); RenderList(); return; }
                 await RefreshPcNetwork();
                 var adb = Tools.Adb != null ? await Tools.DevicesAsync() : new List<AdbDev>();
                 var probes = new Dictionary<string, bool>();
@@ -1954,6 +2027,7 @@ namespace Cysms
             var ready = rows.Where(r => r.State == "connected" || r.State == "online").ToList();
             SetStatus(rows.Count == 0 ? "No devices yet – plug one in or use Add device"
                 : rows.Count + " device(s), " + ready.Count + " ready. Select one and press Connect.");
+            if (Program.DemoShots) { await DemoScreenshots(); return; }
             if (!store.AppBool("TourSeen")) ShowTour();
             if (store.AppBool("AutoConnectSingle") && ready.Count == 1 && Tools.Scrcpy != null)
             {
