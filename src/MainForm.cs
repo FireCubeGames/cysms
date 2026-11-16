@@ -25,7 +25,13 @@ namespace Cysms
 
     public class MainForm : Form
     {
-        public const string Version = "5.6.1";
+        // From <Version> in CYSMS.csproj, so the number shown always matches the build
+        public static readonly string Version = AppVersion();
+        static string AppVersion()
+        {
+            var v = typeof(MainForm).Assembly.GetName().Version;
+            return v == null ? "" : v.Build > 0 || v.Revision <= 0 ? v.ToString(3) : v.ToString(4);
+        }
         readonly Store store;
         readonly string logDir, shotDir;
 
@@ -83,7 +89,7 @@ namespace Cysms
             activeProfile = store.HasProfile(store.AppStr("LastProfile")) ? store.AppStr("LastProfile") : store.Profiles[0].Key;
             cur = store.GetProfile(activeProfile);
 
-            Text = "CYSMS"; Icon = AppIcon; StartPosition = FormStartPosition.CenterScreen;
+            Text = "CYSMS " + Version; Icon = AppIcon; StartPosition = FormStartPosition.CenterScreen;
             AutoScaleMode = AutoScaleMode.None;
             MinimumSize = new Size(S(400), S(330)); Size = WantSize(SimpleMode);
             BackColor = Bg; Font = FontUI; KeyPreview = true;
@@ -169,7 +175,7 @@ namespace Cysms
             });
             helpMenu.Items.Add("-");
             helpMenu.Items.Add("About CYSMS", null, (s, e) => Msg(
-                "CYSMS " + Version + "\nAndroid screen mirroring launcher powered by scrcpy (Genymobile, Apache 2.0).\n\n" +
+                "CYSMS version " + Version + "\nAndroid screen mirroring launcher powered by scrcpy (Genymobile, Apache 2.0).\n\n" +
                 "scrcpy: " + (Tools.Scrcpy ?? "not found") + (Tools.IsBundled ? " (bundled)" : "") + "\nadb: " + (Tools.Adb ?? "not found") + "\nData: " + store.Dir, "About CYSMS"));
             help.Click += (s, e) => helpMenu.Show(help, 0, help.Height);
             modeBtn = Btn("Advanced mode");
@@ -648,7 +654,7 @@ namespace Cysms
 
         void BuildTray()
         {
-            tray = new NotifyIcon { Icon = AppIcon, Text = "CYSMS", Visible = true, ContextMenuStrip = new ContextMenuStrip() };
+            tray = new NotifyIcon { Icon = AppIcon, Text = "CYSMS " + Version, Visible = true, ContextMenuStrip = new ContextMenuStrip() };
             var m = tray.ContextMenuStrip;
             m.Opening += (s, e) =>
             {
