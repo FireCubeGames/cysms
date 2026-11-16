@@ -7,6 +7,7 @@ using System.Linq;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -18,6 +19,27 @@ namespace Cysms
         public static string AppDir = AppDomain.CurrentDomain.BaseDirectory.TrimEnd('\\');
         public static string Scrcpy, Adb, ScrcpyVersion = "";
         public static bool IsBundled;
+        public static string BundledProblem;   // why the included scrcpy can't run on this PC (null = it can)
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        static extern bool IsWow64Process2(IntPtr process, out ushort processMachine, out ushort nativeMachine);
+
+        // The PC's real CPU architecture, also when CYSMS itself runs under emulation: x64, x86, ARM64
+        public static string NativeArch()
+        {
+            try
+            {
+                if (IsWow64Process2(Process.GetCurrentProcess().Handle, out _, out var native))
+                {
+                    if (native == 0xAA64) return "ARM64";
+                    if (native == 0x8664) return "x64";
+                    if (native == 0x014C) return "x86";
+                }
+            }
+            catch { }   // IsWow64Process2 needs Windows 10 1709+
+            var a = (Environment.GetEnvironmentVariable("PROCESSOR_ARCHITEW6432") ?? Environment.GetEnvironmentVariable("PROCESSOR_ARCHITECTURE") ?? "").ToUpperInvariant();
+            return a == "ARM64" ? "ARM64" : a == "AMD64" ? "x64" : a == "X86" ? "x86" : a;
+        }
 
         // ---------------------------------------------------------------- find
         public static void Locate(string userPath, bool preferBundled)
@@ -25,7 +47,10 @@ namespace Cysms
             var bundled = Path.Combine(AppDir, "scrcpy", "scrcpy.exe");
             var cands = new List<string>();
             if (!string.IsNullOrEmpty(userPath)) cands.Add(userPath);
-            if (preferBundled) cands.Insert(0, bundled); else cands.Add(bundled);
+            // The bundled scrcpy is the 64-bit (x64) build: skip it where Windows can't run it
+            BundledProblem = Compat.BundledRuns(Environment.OSVersion.Version, Environment.Is64BitOperatingSystem, NativeArch()) ? null
+                : !Environment.Is64BitOperatingSystem ? "32-bit Windows" : "Windows 10 on ARM";
+            if (BundledProblem == null) { if (preferBundled) cands.Insert(0, bundled); else cands.Add(bundled); }
             cands.Add(Path.Combine(AppDir, "scrcpy.exe"));
             foreach (var dir in (Environment.GetEnvironmentVariable("PATH") ?? "").Split(';'))
             {

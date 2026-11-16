@@ -238,6 +238,45 @@ namespace Cysms
             }
         }
 
+        public const string CompatText =
+@"WINDOWS (this PC)
+
+Supported
+  - Windows 11 (64-bit), including Windows 11 on ARM.
+  - Windows 10 version 1903 or later, 64-bit.
+
+Not supported
+  - Windows 10 on ARM: the included scrcpy is 64-bit (x64), which Windows 10
+    on ARM can't run. You can try the 32-bit scrcpy (scrcpy-win32) with
+    ""Locate scrcpy.exe"".
+  - 32-bit Windows: same fix, use the 32-bit scrcpy.
+  - Windows 10 before 1903, Windows 8.1 and Windows 7.
+
+ANDROID (your phone or tablet)
+
+  Android 5.0 or later   Mirroring and control (USB or Wi-Fi)
+  Android 10 or later    Separate virtual display (Desktop tab)
+  Android 11 or later    Sound on the PC. On Android 11 itself, keep the
+                         phone unlocked while it connects.
+                         Pair with code (wireless debugging, no cable)
+  Android 12 or later    Phone camera as the source
+  Android 13 or later    App playback audio, keep sound on the phone too
+  USB only               AOA keyboard, mouse and gamepad modes
+
+What CYSMS does about it
+  - Devices older than Android 5.0 show ""Not supported"" in the list.
+  - Settings a device can't use are switched off for that session
+    (for example sound on Android 10), and the status bar says so.
+  - Settings that are the whole point of a profile (camera, virtual
+    display) stop with an explanation instead of failing.
+
+Brands
+  Some manufacturers add extra switches (Samsung Auto Blocker, Xiaomi
+  ""USB debugging (Security settings)""). See Help > Phone setup guide.
+
+Limits come from scrcpy, which CYSMS uses:
+https://github.com/Genymobile/scrcpy";
+
         public const string SetupGuide =
 @"GETTING A PHONE READY  (one time per phone)
 

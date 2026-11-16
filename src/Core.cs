@@ -707,6 +707,9 @@ namespace Cysms
         public static string LogHint(string log)
         {
             log = log ?? "";
+            var m = Regex.Match(log, @"([A-Za-z ]+?) (?:is|are) not supported before Android (\d+)");
+            if (m.Success) return m.Groups[1].Value.Trim() + " needs Android " + m.Groups[2].Value + " or later. Turn that option off for this device.";
+            if (Regex.IsMatch(log, "not a valid Win32 application|0x800700C1|This version of .* is not compatible", RegexOptions.IgnoreCase)) return "The included scrcpy can't run on this PC (it needs 64-bit Windows 10/11, or Windows 11 on ARM).";
             if (log.Contains("INJECT_EVENT")) return "Xiaomi/Redmi/POCO: turn on \"USB debugging (Security settings)\" in Developer options, or enable View only.";
             if (Regex.IsMatch(log, "encoder|codec", RegexOptions.IgnoreCase) && Regex.IsMatch(log, "ERROR")) return "This device may not support the chosen video codec or encoder. Try H.264 and a blank encoder in the Video tab, or lower Max size.";
             if (Regex.IsMatch(log, "camera", RegexOptions.IgnoreCase) && log.Contains("ERROR")) return "Camera mirroring needs Android 12+ and a supported camera size. Try leaving Camera resolution blank.";
@@ -718,6 +721,88 @@ namespace Cysms
         }
 
         public static IEnumerable<string> Lines(string text) => (text ?? "").Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
+    }
+
+    // =========================================================================
+    // Compatibility: what the PC and each Android device can do (from scrcpy's documented limits)
+    // =========================================================================
+    public static class Compat
+    {
+        public const int MinSdk = 21;          // scrcpy: "The Android device requires at least API 21 (Android 5.0)"
+        public const int MinWindowsBuild = 18362;   // Windows 10 1903: first release with .NET Framework 4.8 built in
+
+        static readonly Dictionary<int, string> Names = new Dictionary<int, string>
+        {
+            {16,"4.1"},{17,"4.2"},{18,"4.3"},{19,"4.4"},{20,"4.4W"},{21,"5.0"},{22,"5.1"},{23,"6"},{24,"7.0"},{25,"7.1"},
+            {26,"8.0"},{27,"8.1"},{28,"9"},{29,"10"},{30,"11"},{31,"12"},{32,"12L"},{33,"13"},{34,"14"},{35,"15"},{36,"16"},
+        };
+
+        public static string AndroidName(int sdk) => Names.TryGetValue(sdk, out var n) ? "Android " + n : "API level " + sdk;
+
+        public static int? ParseSdk(string v) => int.TryParse((v ?? "").Trim(), out var n) && n > 0 ? n : (int?)null;
+
+        public class Result
+        {
+            public string Block;                                 // can't mirror with these settings: explain why
+            public readonly List<string> Notes = new List<string>();   // settings CYSMS changed for this session
+            public Dictionary<string, object> Settings;
+        }
+
+        // Checks settings against the device's Android version (sdk = ro.build.version.sdk; null = unknown).
+        // Hard limits block with an explanation; optional extras are switched off for this session with a note.
+        public static Result ForDevice(int? sdk, Dictionary<string, object> s, bool usb)
+        {
+            var r = new Result { Settings = new Dictionary<string, object>(s) };
+            var d = r.Settings;
+            if (sdk.HasValue)
+            {
+                int v = sdk.Value;
+                string has = "This device has " + AndroidName(v) + ".";
+                if (v < MinSdk) { r.Block = "Mirroring needs Android 5.0 or later. " + has + " Older devices aren't supported by scrcpy, which CYSMS uses."; return r; }
+                if (Schema.Str(d, "VideoSource") == "camera" && v < 31)
+                { r.Block = "Camera mirroring needs Android 12 or later. " + has + " In Advanced mode, set Video > Source back to Device screen."; return r; }
+                if (Schema.B(d, "NewDisplay") && v < 29)
+                { r.Block = "A separate virtual display needs Android 10 or later. " + has + " In Advanced mode, turn off Desktop > Use a separate virtual display."; return r; }
+                if (Schema.B(d, "Audio"))
+                {
+                    if (v < 30) { d["Audio"] = false; r.Notes.Add("no sound on the PC (needs Android 11 or later)"); }
+                    else
+                    {
+                        if (v < 33 && (Schema.Str(d, "AudioSource") == "playback" || Schema.B(d, "AudioDup")))
+                        { d["AudioSource"] = "output"; d["AudioDup"] = false; r.Notes.Add("normal device sound used (app playback needs Android 13)"); }
+                        if (v == 30) r.Notes.Add("Android 11: keep the phone unlocked while it connects, or there will be no sound");
+                    }
+                }
+            }
+            if (!usb)
+            {
+                var aoa = new List<string>();
+                foreach (var k in new[] { "Keyboard", "Mouse", "Gamepad" })
+                    if (Schema.Str(d, k) == "aoa") { d[k] = k == "Gamepad" ? "disabled" : "sdk"; aoa.Add(k.ToLowerInvariant()); }
+                if (aoa.Count > 0) r.Notes.Add("standard " + string.Join(" and ", aoa) + " used (AOA mode only works over USB)");
+            }
+            return r;
+        }
+
+        // Returns a warning when this PC is outside what CYSMS supports, or null when everything is fine.
+        public static string WindowsNote(Version os, bool is64BitOs, string nativeArch)
+        {
+            if (!is64BitOs)
+                return "This PC runs 32-bit Windows. The scrcpy included with CYSMS is 64-bit and can't run here.\n\n" +
+                       "Download scrcpy-win32 from the scrcpy releases page, extract it, and choose \u201CLocate scrcpy.exe\u201D in the yellow bar.";
+            if (nativeArch == "ARM64" && os.Build < 22000)
+                return "This PC runs Windows 10 on ARM, which can't run the 64-bit scrcpy included with CYSMS.\n\n" +
+                       "Windows 11 on ARM is supported. On Windows 10 on ARM you can try the 32-bit scrcpy (scrcpy-win32) with \u201CLocate scrcpy.exe\u201D.";
+            if (os.Major < 10)
+                return "CYSMS is made for Windows 10 (version 1903 or later) and Windows 11. This version of Windows isn't supported, so some things may not work.";
+            if (os.Build < MinWindowsBuild)
+                return "This Windows 10 version is older than 1903, which CYSMS doesn't support. Please run Windows Update; some things may not work until then.";
+            return null;
+        }
+
+        // Can the bundled 64-bit (x64) scrcpy run on this PC?
+        public static bool BundledRuns(Version os, bool is64BitOs, string nativeArch) =>
+            is64BitOs && !(nativeArch == "ARM64" && os.Build < 22000);
     }
 
     // =========================================================================
@@ -761,7 +846,7 @@ namespace Cysms
             {"AutoWireless", true}, {"PreferBundled", true}, {"SeededV5", false},
             {"Theme", "Forest"}, {"StickerFolder", ""}, {"ShowStickers", true}, {"Mode", "Simple"},
             {"ForestDefault", false}, {"SimpleSize", ""}, {"AdvancedSize", ""},
-            {"Columns", "Status,Via,Wi-Fi network,Battery"}, {"TourSeen", false},
+            {"Columns", "Status,Via,Wi-Fi network,Battery"}, {"TourSeen", false}, {"WindowsNoteSeen", ""},
         };
 
         public Store(string dir) { Dir = dir; }
