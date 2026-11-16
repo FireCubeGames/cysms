@@ -25,7 +25,7 @@ namespace Cysms
 
     public class MainForm : Form
     {
-        public const string Version = "5.6.0";
+        public const string Version = "5.6.1";
         readonly Store store;
         readonly string logDir, shotDir;
 
@@ -309,6 +309,10 @@ namespace Cysms
 
             phoneBar = Flow();
             phoneBar.Controls.Add(Lbl("Phone:", null, Muted));
+            var bUnlock = Btn("Unlock", small: true);
+            Tip.SetToolTip(bUnlock, "Wake a locked device and open its PIN / password entry, so you can type it from this PC");
+            bUnlock.Click += (s, e) => RunAction(UnlockSelected);
+            phoneBar.Controls.Add(bUnlock);
             foreach (var kb in PhoneKeys)
             {
                 var b = Btn(kb.Item1, small: true); int code = kb.Item2;
@@ -717,6 +721,8 @@ namespace Cysms
                 int code = kb.Item2;
                 phoneMenu.Items.Add(kb.Item3, null, (s, e) => RunAction(() => SendKey(code)));
             }
+            phoneMenu.Items.Insert(0, new ToolStripMenuItem("Wake and open PIN entry", null, (s, e) => RunAction(UnlockSelected)) { ToolTipText = "Wakes a locked device and opens its PIN / password entry, so you can type it from this PC" });
+            phoneMenu.Items.Insert(1, new ToolStripSeparator());
             phoneMenu.Items.Add("-");
             phoneMenu.Items.Add("Take screenshot", null, (s, e) => RunAction(Screenshot));
             btnQuality.Click += (s, e) => { SyncSimple(); qualityMenu.Show(btnQuality, 0, btnQuality.Height); };
@@ -1630,6 +1636,15 @@ namespace Cysms
             s = compat.Settings;
             string compatNote = compat.Notes.Count > 0 ? " Note: " + string.Join("; ", compat.Notes) + "." : "";
 
+            // Locked device: mirroring still works and shows the lock screen, but face/fingerprint unlock can't be
+            // used from the PC, View only can't unlock at all, and Android 11 needs it unlocked for sound
+            var lockOut = await Tools.AdbShellAsync(serial, Parse.LockProbe, 6000);
+            bool locked = Parse.Locked(lockOut) == true;
+            DiagLog("lock probe " + r.Name + " -> " + (Parse.Locked(lockOut)?.ToString() ?? "unknown") + "\n" + lockOut);
+            bool control = !Schema.B(s, "ViewOnly");
+            if (locked && !LockWarning(r.Name, control, Schema.B(s, "Audio") && await SdkOf(serial) == 30))
+            { SetStatus(r.Name + " is locked: unlock it, then press Connect"); return; }
+
             int? autoBr = null, autoMs = null;
             if (Schema.B(s, "AutoBitRate"))
             {
@@ -1655,6 +1670,7 @@ namespace Cysms
             {
                 var sess = Session.Launch(r.Key, r.Name, args, log, Schema.B(s, "Record"));
                 sess.Settings = s; sess.Retried = retried; sess.Profile = r.Saved ? r.Profile : activeProfile;
+                sess.Serial = serial; sess.Locked = locked && control;
                 sessions.Add(sess);
             }
             catch (Exception ex) { Err("Couldn't start scrcpy:\n" + ex.Message); return; }
@@ -1669,6 +1685,59 @@ namespace Cysms
             var sdk = Compat.ParseSdk(await Tools.GetPropAsync(serial, "ro.build.version.sdk"));
             if (sdk.HasValue && di != null) di.Sdk = sdk;
             return sdk;
+        }
+
+        async Task UnlockSelected()
+        {
+            var r = SelectedRow(); if (r == null || r.AdbState != "device") return;
+            await ShowUnlockScreen(r.Serial);
+            SetStatus(r.Name + ": PIN entry is open. Type your PIN or password and press Enter" + (SessionFor(r.Key) != null ? " (it may look black in the mirror)." : ", or connect first to do it from the mirror."));
+        }
+
+        // Wakes the device and asks Android to show its PIN / pattern screen (no effect on swipe-only locks except unlocking)
+        async Task ShowUnlockScreen(string serial)
+        {
+            var o = await Tools.AdbShellAsync(serial, "input keyevent 224; wm dismiss-keyguard", 6000);
+            DiagLog("dismiss-keyguard " + serial + " -> " + o);
+        }
+
+        // Shown before connecting to a locked device. Returns false to cancel.
+        bool LockWarning(string name, bool control, bool android11Audio)
+        {
+            if (control && !android11Audio && store.AppBool("HideLockWarning")) { return true; }
+            string text = !control
+                ? name + " is locked, and View only is on, so it can't be unlocked from this PC.\n\nUnlock it on the device first, or turn off View only (Options)."
+                : name + " is locked. Mirroring still works, but:\n\n" +
+                  "\u2022 Face and fingerprint unlock only work on the device itself.\n" +
+                  "\u2022 To unlock from this PC: swipe up in the mirror window, type your PIN or password and press Enter. " +
+                  "Android hides the PIN screen from screen capture, so it may look black while you type. A pattern can't be drawn blind, so unlock it on the device.\n" +
+                  "\u2022 If the mirror goes black later, the screen has timed out: right-click in the mirror to wake it." +
+                  (android11Audio ? "\n\nOn Android 11, sound only reaches the PC if the device is unlocked when mirroring starts." : "");
+            using (var f = new Form { Text = "Device is locked", StartPosition = FormStartPosition.CenterParent, Icon = AppIcon, BackColor = Card, Font = FontUI,
+                                      FormBorderStyle = FormBorderStyle.FixedDialog, MaximizeBox = false, MinimizeBox = false, ShowInTaskbar = false,
+                                      AutoScaleMode = AutoScaleMode.None, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, Padding = new Padding(S(16)) })
+            {
+                var t = new TableLayoutPanel { AutoSize = true, ColumnCount = 1, Dock = DockStyle.Fill };
+                var lbl = Lbl(text); lbl.MaximumSize = new Size(S(440), 0); lbl.Margin = new Padding(0, 0, 0, S(12));
+                t.Controls.Add(lbl);
+                var dont = new CheckBox { Text = "Don't warn me again (the status bar still says when a device is locked)", AutoSize = true, Visible = control && !android11Audio };
+                t.Controls.Add(dont);
+                var bar = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.RightToLeft, Dock = DockStyle.Fill, Margin = new Padding(0, S(12), 0, 0) };
+                var go = Btn(control ? "Connect" : "Connect anyway", true); var cancel = Btn("Cancel");
+                go.DialogResult = DialogResult.OK; cancel.DialogResult = DialogResult.Cancel;
+                bar.Controls.Add(go); bar.Controls.Add(cancel);
+                t.Controls.Add(bar);
+                f.Controls.Add(t); f.AcceptButton = go; f.CancelButton = cancel;
+                var ok = f.ShowDialog(this) == DialogResult.OK;
+                if (ok && dont.Checked) { store.App["HideLockWarning"] = true; store.SaveApp(); }
+                return ok;
+            }
+        }
+
+        static void DiagLog(string text)
+        {
+            if (!Program.Diag) return;
+            try { File.AppendAllText(Path.Combine(Tools.AppDir, "diag.txt"), DateTime.Now.ToString("s") + "  " + text + "\r\n\r\n"); } catch { }
         }
 
         void StopSelected()
@@ -1723,6 +1792,8 @@ namespace Cysms
                     s.Verified = true; changed = true;
                     SetStatus("Mirroring " + s.Name + (s.Retried ? " with H.264 (saved for next time)" : ""));
                     ShowMoodToast("start", s.Name + " is live!");
+                    if (s.Locked)
+                        SetStatus(s.Name + " is locked: swipe up in the mirror, then type your PIN or password and press Enter (the PIN screen may look black).");
                     if (s.Retried && s.Profile != null && store.HasProfile(s.Profile))
                     {
                         var p = store.GetProfile(s.Profile); p["VideoCodec"] = "h264"; p["VideoEncoder"] = "";

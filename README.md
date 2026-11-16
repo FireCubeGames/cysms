@@ -69,6 +69,15 @@ How CYSMS handles a feature the device's Android version can't do:
 - **Settings a profile depends on stop with an explanation.** A camera or virtual-display profile on a phone that's too old shows what's needed instead of trying and failing.
 - AOA keyboard, mouse and gamepad modes only work over USB; over Wi-Fi CYSMS uses the standard modes.
 
+### Locked devices
+
+You can connect to a locked phone: the mirror shows its lock screen, and CYSMS warns you first.
+
+- Face and fingerprint unlock only work on the device itself.
+- To unlock from the PC, swipe up in the mirror, type your PIN or password and press **Enter** (or use **Phone > Wake and open PIN entry**). Android hides the PIN screen from screen capture, so the mirror may look black while you type. Patterns can't be drawn blind, so unlock those on the device.
+- With **View only** on, a locked device can't be unlocked from the PC. On Android 11, unlock the device before connecting if you want sound.
+- If the mirror goes black later, the device's screen has timed out: right-click in the mirror to wake it.
+
 Some brands add their own switches (Samsung Auto Blocker, Xiaomi "USB debugging (Security settings)"). Help > Phone setup guide in the app covers them. These limits come from [scrcpy's documentation](https://github.com/Genymobile/scrcpy#requirements); Help > Compatibility in the app has the same table.
 
 ## First-time phone set-up

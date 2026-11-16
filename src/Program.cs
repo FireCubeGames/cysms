@@ -13,13 +13,14 @@ namespace Cysms
 
         // Demo mode (--demo, or a file named CYSMS.demo next to the exe) shows sample devices from a throw-away
         // data folder, for screenshots. With the file, it also saves screenshots to a "screenshots" folder and exits.
-        public static bool Demo, DemoShots;
+        public static bool Demo, DemoShots, Diag;   // Diag: a file named CYSMS.diag next to the exe writes diag.txt there
 
         [STAThread]
         static void Main(string[] args)
         {
             var flag = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "CYSMS.demo");
             DemoShots = File.Exists(flag);
+            Diag = File.Exists(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "CYSMS.diag"));
             Demo = DemoShots || Array.IndexOf(args, "--demo") >= 0;
             bool created;
             using (var mutex = new Mutex(true, Demo ? @"Local\CYSMS_Native_Demo" : @"Local\CYSMS_Native_SingleInstance", out created))

@@ -588,6 +588,23 @@ namespace Cysms
             return m.Success && (m.Groups[1].Value == "2" || m.Groups[1].Value == "5");
         }
 
+        // Is the device's lock screen (keyguard) showing? Reads the flags Android prints in "dumpsys window"
+        // and "dumpsys activity activities"; their names vary by version. null = couldn't tell.
+        public const string LockProbe =
+            "dumpsys window | grep -E -m 8 'mDreamingLockscreen=|eyguardShowing=|mShowingLockscreen=|mInputRestricted=| showing=|isShowing='; " +
+            "dumpsys activity activities | grep -E -m 4 'eyguardShowing=|KeyguardController'";
+
+        public static bool? Locked(string text)
+        {
+            bool seen = false;
+            foreach (Match m in Regex.Matches(text ?? "", @"(mDreamingLockscreen|[Kk]eyguardShowing|mShowingLockscreen|mInputRestricted|\bshowing|isShowing)=(true|false)"))
+            {
+                seen = true;
+                if (m.Groups[2].Value == "true") return true;
+            }
+            return seen ? false : (bool?)null;
+        }
+
         // Wi-Fi link speed (Mbps) from "dumpsys wifi" / "cmd wifi status" output
         public static int? WifiLinkSpeed(string text)
         {
@@ -846,7 +863,7 @@ namespace Cysms
             {"AutoWireless", true}, {"PreferBundled", true}, {"SeededV5", false},
             {"Theme", "Forest"}, {"StickerFolder", ""}, {"ShowStickers", true}, {"Mode", "Simple"},
             {"ForestDefault", false}, {"SimpleSize", ""}, {"AdvancedSize", ""},
-            {"Columns", "Status,Via,Wi-Fi network,Battery"}, {"TourSeen", false}, {"WindowsNoteSeen", ""},
+            {"Columns", "Status,Via,Wi-Fi network,Battery"}, {"TourSeen", false}, {"WindowsNoteSeen", ""}, {"HideLockWarning", false},
         };
 
         public Store(string dir) { Dir = dir; }
