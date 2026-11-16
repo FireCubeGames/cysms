@@ -35,11 +35,47 @@ Good to know:
 - To update, download the newer zip and replace the folder. Your devices and settings are kept separately in `%LOCALAPPDATA%\CYSMS`.
 - To remove CYSMS, delete the folder (and `%LOCALAPPDATA%\CYSMS` if you also want to remove your settings).
 
-Requirements: Windows 10 (version 1903 or later) or Windows 11, and an Android device with USB debugging turned on.
+See [Compatibility](#compatibility) below for which Windows and Android versions work.
+
+## Compatibility
+
+### Windows
+
+| Windows | Supported | Notes |
+|---|---|---|
+| Windows 11, 64-bit (x64) | Yes | |
+| Windows 11 on ARM | Yes | The included 64-bit scrcpy runs under Windows 11's x64 emulation. |
+| Windows 10 version 1903 or later, 64-bit | Yes | .NET Framework 4.8, which CYSMS needs, is built in from 1903. |
+| Windows 10 on ARM | No | Can't run the included 64-bit scrcpy. You can try the 32-bit `scrcpy-win32` from the [scrcpy releases](https://github.com/Genymobile/scrcpy/releases) with **Locate scrcpy.exe**. |
+| 32-bit Windows 10 | No | Same workaround: use `scrcpy-win32`. |
+| Windows 10 before 1903, Windows 8.1, Windows 7 | No | Not tested and not supported. |
+
+If CYSMS starts on an unsupported PC, it says so once and explains the workaround. When the included scrcpy can't run, the yellow bar at the top asks you to locate a compatible one.
+
+### Android
+
+| Android version | What works |
+|---|---|
+| 4.4 and older | Not supported: shown as **Not supported** in the device list. |
+| 5.0 or later | Screen mirroring and control, over USB or Wi-Fi (**Make wireless**). |
+| 10 or later | Separate virtual display (Advanced > Desktop). |
+| 11 or later | Phone sound on the PC (on Android 11 itself, keep the phone unlocked while it connects). **Pair with code** (no cable). |
+| 12 or later | Phone camera as the video source. |
+| 13 or later | App-playback audio, and keeping sound on the phone at the same time. |
+
+How CYSMS handles a feature the device's Android version can't do:
+
+- **Optional extras are switched off for that session**, and the status bar says what changed. For example, sound on an Android 10 phone: it mirrors without sound instead of failing.
+- **Settings a profile depends on stop with an explanation.** A camera or virtual-display profile on a phone that's too old shows what's needed instead of trying and failing.
+- AOA keyboard, mouse and gamepad modes only work over USB; over Wi-Fi CYSMS uses the standard modes.
+
+Some brands add their own switches (Samsung Auto Blocker, Xiaomi "USB debugging (Security settings)"). Help > Phone setup guide in the app covers them. These limits come from [scrcpy's documentation](https://github.com/Genymobile/scrcpy#requirements); Help > Compatibility in the app has the same table.
 
 ## First-time phone set-up
 
 <p align="center"><img src="docs/screenshots/tour.png" width="420" alt="The CYSMS quick tour"></p>
+
+You need Android 5.0 or later.
 
 1. On the phone: **Settings > About phone**, tap **Build number** seven times to unlock Developer options.
 2. **Settings > System > Developer options**: turn on **USB debugging**.

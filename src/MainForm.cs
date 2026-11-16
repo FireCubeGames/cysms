@@ -21,11 +21,11 @@ namespace Cysms
         public string AdbState;   // raw adb state if adb knows the device
     }
 
-    class DevInfo { public int? Battery; public bool Charging; public string Android = "", HwSerial = "", Ssid; public DateTime When; }
+    class DevInfo { public int? Battery, Sdk; public bool Charging; public string Android = "", HwSerial = "", Ssid; public DateTime When; }
 
     public class MainForm : Form
     {
-        public const string Version = "5.5.1";
+        public const string Version = "5.6.0";
         readonly Store store;
         readonly string logDir, shotDir;
 
@@ -65,7 +65,7 @@ namespace Cysms
         Button modeBtn;
         Button btnQuality, btnOptions, btnPhone;
         ContextMenuStrip qualityMenu, optionsMenu, phoneMenu, columnMenu;
-        Label headSub;
+        Label headSub, bannerText;
         static readonly (string, int, string)[] PhoneKeys =
         {
             ("Wake", 224, "Turn the screen on"), ("Lock", 223, "Turn the screen off"), ("Home", 3, "Home"), ("Back", 4, "Back"),
@@ -155,6 +155,7 @@ namespace Cysms
             helpMenu.Items.Add("Quick tour", null, (s, e) => ShowTour());
             helpMenu.Items.Add("Phone setup guide", null, (s, e) => TextWindow("CYSMS – Phone setup guide", SetupGuide));
             helpMenu.Items.Add("What Simple mode decides for you", null, (s, e) => Msg(SimpleHelp, "Simple mode"));
+            helpMenu.Items.Add("Compatibility", null, (s, e) => TextWindow("CYSMS \u2013 Compatibility", CompatText, 640, 600));
             helpMenu.Items.Add("Keyboard shortcuts", null, (s, e) => TextWindow("CYSMS – Shortcuts", ShortcutText(Schema.Str(cur, "ShortcutMod")), 600, 640));
             helpMenu.Items.Add("-");
             helpMenu.Items.Add("Open logs folder", null, (s, e) => OpenFolder(logDir));
@@ -189,7 +190,8 @@ namespace Cysms
         void BuildBanner()
         {
             banner = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, BackColor = Warn, Padding = new Padding(S(14), S(6), S(14), S(6)), Visible = false };
-            banner.Controls.Add(Lbl("scrcpy was not found.", FontBold, WarnText));
+            bannerText = Lbl("scrcpy was not found.", FontBold, WarnText);
+            banner.Controls.Add(bannerText);
             var locate = Btn("Locate scrcpy.exe...", small: true);
             var dl = Btn("Download page", small: true);
             var re = Btn("Re-check", small: true);
@@ -859,6 +861,17 @@ namespace Cysms
             reallyExit = true; Close();
         }
 
+        // =================================================================== Windows compatibility
+        void CheckWindows()
+        {
+            var note = Compat.WindowsNote(Environment.OSVersion.Version, Environment.Is64BitOperatingSystem, Tools.NativeArch());
+            if (note == null) return;
+            var key = Environment.OSVersion.Version + "/" + Tools.NativeArch() + "/" + Environment.Is64BitOperatingSystem;
+            if (store.AppStr("WindowsNoteSeen") == key) return;   // shown once per Windows version
+            store.App["WindowsNoteSeen"] = key; store.SaveApp();
+            Msg(note + "\n\nHelp > Compatibility lists what CYSMS supports.", "CYSMS \u2013 This PC");
+        }
+
         // =================================================================== quick tour
         void ShowTour()
         {
@@ -871,6 +884,7 @@ namespace Cysms
                     "On the phone:\n\n" +
                     "\u2022 Settings > About phone: tap Build number 7 times to unlock Developer options.\n" +
                     "\u2022 Settings > System > Developer options: turn on USB debugging.\n\n" +
+                    "Works with Android 5.0 or later. Sound on the PC needs Android 11 or later.\n\n" +
                     "Menu names differ a little between brands. The full guide has the details." },
                 new[] { "2. Plug it in and connect",
                     "\u2022 Connect the phone to this PC with a USB cable.\n" +
@@ -1121,6 +1135,9 @@ namespace Cysms
         {
             Tools.Locate(store.AppStr("ScrcpyPath"), store.AppBool("PreferBundled"));
             banner.Visible = Tools.Scrcpy == null;
+            bannerText.Text = Tools.BundledProblem != null
+                ? "The included scrcpy can't run on " + Tools.BundledProblem + ". Download the 32-bit scrcpy (scrcpy-win32) and locate it."
+                : "scrcpy was not found.";
             toolLabel.Text = Tools.Scrcpy == null ? "scrcpy not found" : "scrcpy" + (Tools.IsBundled ? " (bundled)" : "") + (Tools.Adb != null ? " – adb ready" : " – adb missing");
             UpdateResponsive();
             toolLabel.ForeColor = Tools.Scrcpy == null ? Col("#FCA5A5") : HeadSub;
@@ -1257,6 +1274,7 @@ namespace Cysms
                 var bat = await Tools.AdbShellAsync(r.Serial, "dumpsys battery", 6000);
                 di.Battery = Parse.BatteryLevel(bat); di.Charging = Parse.BatteryCharging(bat);
                 di.Android = await Tools.GetPropAsync(r.Serial, "ro.build.version.release");
+                di.Sdk = Compat.ParseSdk(await Tools.GetPropAsync(r.Serial, "ro.build.version.sdk"));
                 di.HwSerial = await Tools.GetPropAsync(r.Serial, "ro.serialno");
                 di.Ssid = Parse.PhoneSsid(await Tools.AdbShellAsync(r.Serial, "cmd wifi status 2>/dev/null | head -20; dumpsys wifi | grep -m 1 mWifiInfo", 8000));
                 if (di.Ssid != null)
@@ -1313,9 +1331,10 @@ namespace Cysms
             string net = "";
             if (live && di?.Ssid != null) net = di.Ssid + (pcSsid != null && di.Ssid != pcSsid ? " (PC is on " + pcSsid + ")" : "");
             else if (r.Saved && r.Dev.LastSsid != "") net = "last seen: " + r.Dev.LastSsid;
+            bool tooOld = live && di?.Sdk < Compat.MinSdk;
             var vals = new[]
             {
-                r.StatusText,
+                tooOld ? "Not supported (needs Android 5+)" : r.StatusText,
                 r.Type == "usb" ? "USB" : "Wi-Fi",
                 net,
                 live && di?.Battery != null ? di.Battery + "%" + (di.Charging ? " ⚡" : "") : "",
@@ -1600,6 +1619,17 @@ namespace Cysms
                 Err("Unlock " + r.Name + " and tap 'Allow' on the USB debugging prompt, then press Connect again."); return;
             }
 
+            // Compatibility: block what this Android version can't do, switch off optional extras it lacks
+            var compat = Compat.ForDevice(await SdkOf(serial), s, r.Type == "usb");
+            if (compat.Block != null)
+            {
+                ShowMoodToast("fail", "Not on this device");
+                Err(r.Name + " can't be mirrored with these settings.\n\n" + compat.Block, "Not supported on this device");
+                SetStatus(r.Name + ": not supported with these settings"); return;
+            }
+            s = compat.Settings;
+            string compatNote = compat.Notes.Count > 0 ? " Note: " + string.Join("; ", compat.Notes) + "." : "";
+
             int? autoBr = null, autoMs = null;
             if (Schema.B(s, "AutoBitRate"))
             {
@@ -1628,8 +1658,17 @@ namespace Cysms
                 sessions.Add(sess);
             }
             catch (Exception ex) { Err("Couldn't start scrcpy:\n" + ex.Message); return; }
-            SetStatus("Starting mirroring for " + r.Name + "...");
+            SetStatus("Starting mirroring for " + r.Name + "..." + compatNote);
             await RefreshDevices();
+        }
+
+        // Android API level of a connected device (cached by UpdateInfo; asked directly on a first connect)
+        async Task<int?> SdkOf(string serial)
+        {
+            if (info.TryGetValue(serial, out var di) && di.Sdk.HasValue) return di.Sdk;
+            var sdk = Compat.ParseSdk(await Tools.GetPropAsync(serial, "ro.build.version.sdk"));
+            if (sdk.HasValue && di != null) di.Sdk = sdk;
+            return sdk;
         }
 
         void StopSelected()
@@ -2028,6 +2067,7 @@ namespace Cysms
             SetStatus(rows.Count == 0 ? "No devices yet – plug one in or use Add device"
                 : rows.Count + " device(s), " + ready.Count + " ready. Select one and press Connect.");
             if (Program.DemoShots) { await DemoScreenshots(); return; }
+            CheckWindows();
             if (!store.AppBool("TourSeen")) ShowTour();
             if (store.AppBool("AutoConnectSingle") && ready.Count == 1 && Tools.Scrcpy != null)
             {

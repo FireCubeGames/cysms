@@ -86,7 +86,38 @@ static class T {
     Eq("ps data", $"{st5.Devices[0].Name} {st5.Devices[0].AdbSerial} {string.Join(",", st5.Profiles.Select(p=>p.Key))} {st5.GetProfile("Mine")["MaxSize"]}", "Y700-LABS 192.168.50.67:5555 Default,Auto quality,Mine 800");
     var st6 = new Store(psDir); st6.Load(); Eq("seed once", string.Join(",", st6.Profiles.Select(p=>p.Key)), "Default,Auto quality,Mine");
     Directory.Delete(dir, true);
-    Console.WriteLine($"\npassed {pass}, failed {fail}");
+    // ---- compatibility
+var cp = Schema.Merge(new Dictionary<string,object>{{"Audio",true}});
+Eq("compat old android blocks", Compat.ForDevice(19, cp, true).Block != null, true);
+Eq("compat android 5 ok", Compat.ForDevice(21, Schema.Merge(new Dictionary<string,object>()), true).Block, null);
+var a10 = Compat.ForDevice(29, cp, true);
+Eq("compat audio off below 11", Schema.B(a10.Settings, "Audio"), false);
+Eq("compat audio note", a10.Notes.Count, 1);
+Eq("compat original untouched", Schema.B(cp, "Audio"), true);
+Eq("compat android 11 audio note", Compat.ForDevice(30, cp, true).Notes[0].Contains("unlocked"), true);
+Eq("compat android 16 no notes", Compat.ForDevice(36, cp, true).Notes.Count, 0);
+var pb = Schema.Merge(new Dictionary<string,object>{{"Audio",true},{"AudioSource","playback"},{"AudioDup",true}});
+var pb12 = Compat.ForDevice(31, pb, true);
+Eq("compat playback needs 13", Schema.Str(pb12.Settings, "AudioSource") + Schema.B(pb12.Settings, "AudioDup"), "outputFalse");
+Eq("compat camera needs 12", Compat.ForDevice(30, Schema.Merge(new Dictionary<string,object>{{"VideoSource","camera"}}), true).Block.Contains("Android 12"), true);
+Eq("compat camera ok on 12", Compat.ForDevice(31, Schema.Merge(new Dictionary<string,object>{{"VideoSource","camera"}}), true).Block, null);
+Eq("compat new display needs 10", Compat.ForDevice(28, Schema.Merge(new Dictionary<string,object>{{"NewDisplay",true}}), true).Block.Contains("Android 10"), true);
+var aoa = Compat.ForDevice(34, Schema.Merge(new Dictionary<string,object>{{"Keyboard","aoa"},{"Gamepad","aoa"}}), false);
+Eq("compat aoa over wifi", Schema.Str(aoa.Settings, "Keyboard") + "/" + Schema.Str(aoa.Settings, "Gamepad"), "sdk/disabled");
+Eq("compat aoa over usb kept", Schema.Str(Compat.ForDevice(34, Schema.Merge(new Dictionary<string,object>{{"Keyboard","aoa"}}), true).Settings, "Keyboard"), "aoa");
+Eq("compat unknown sdk passes", Compat.ForDevice(null, Schema.Merge(new Dictionary<string,object>{{"VideoSource","camera"}}), true).Block, null);
+Eq("compat names", Compat.AndroidName(33) + "|" + Compat.AndroidName(99), "Android 13|API level 99");
+Eq("compat parse sdk", Compat.ParseSdk(" 36\n") + "|" + (Compat.ParseSdk("error") == null), "36|True");
+Eq("win11 x64 ok", Compat.WindowsNote(new Version(10, 0, 26100), true, "x64"), null);
+Eq("win11 arm ok", Compat.WindowsNote(new Version(10, 0, 22631), true, "ARM64"), null);
+Eq("win10 arm warn", Compat.WindowsNote(new Version(10, 0, 19045), true, "ARM64").Contains("Windows 10 on ARM"), true);
+Eq("win 32-bit warn", Compat.WindowsNote(new Version(10, 0, 19045), false, "x86").Contains("32-bit"), true);
+Eq("win7 warn", Compat.WindowsNote(new Version(6, 1, 7601), true, "x64").Contains("isn't supported"), true);
+Eq("win10 1809 warn", Compat.WindowsNote(new Version(10, 0, 17763), true, "x64").Contains("1903"), true);
+Eq("bundled runs", Compat.BundledRuns(new Version(10, 0, 19045), true, "x64") + "|" + Compat.BundledRuns(new Version(10, 0, 19045), true, "ARM64"), "True|False");
+Eq("hint android too old", Parse.LogHint("[server] ERROR: Camera mirroring is not supported before Android 12"), "Camera mirroring needs Android 12 or later. Turn that option off for this device.");
+
+Console.WriteLine($"\npassed {pass}, failed {fail}");
     return fail == 0 ? 0 : 1;
   }
 }
