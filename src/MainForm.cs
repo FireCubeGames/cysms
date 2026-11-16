@@ -25,7 +25,7 @@ namespace Cysms
 
     public class MainForm : Form
     {
-        public const string Version = "5.5";
+        public const string Version = "5.5.1";
         readonly Store store;
         readonly string logDir, shotDir;
 
@@ -1577,7 +1577,9 @@ namespace Cysms
                     sessions.Remove(s); changed = true;
                     await Task.Delay(150);
                     s.CloseLog();
-                    if (!s.Verified && age < 10)
+                    // Only a non-zero exit is a failure: closing the mirror window yourself ends scrcpy with exit code 0,
+                    // and pressing Stop is never a failure
+                    if (!s.Verified && age < 10 && s.ExitCode != 0 && !s.UserStopped)
                     {
                         var txt = s.ReadLog();
                         var hint = Parse.LogHint(txt);
@@ -1604,7 +1606,7 @@ namespace Cysms
                         if (s.Record) tray.ShowBalloonTip(4000, "Recording saved", s.Name + " was saved in your recordings folder.", ToolTipIcon.Info);
                     }
                 }
-                else if (!s.Verified && age >= 5)
+                else if (!s.Verified && (age >= 5 || age >= 1 && s.ReadLog().Contains("INFO: Texture:")))   // window is up
                 {
                     s.Verified = true; changed = true;
                     SetStatus("Mirroring " + s.Name + (s.Retried ? " with H.264 (saved for next time)" : ""));
